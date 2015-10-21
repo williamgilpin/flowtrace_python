@@ -1,28 +1,10 @@
-# pathlapse - python
+# flowtrace for Python
 
-The Python version of the pathlapse tool.
+The code repository for the Python 2 / Python 3 implementation of flowtrace.
 
-Developed by William Gilpin, Vivek Prakash, and Manu Prakash, 2015
+The documentation for this repository has moved to [here](http://williamgilpin.github.io/flowtrace_docs/flowtrace_python.html)
 
-
-# Installation
-
-### Dependencies
-
-+ numpy
-+ matplotlib
-+ scipy
-
-### Instructions
-
-
-# Usage
-
-  from flowtrace import flowtrace
-
-  flowtrace()
-
-# Development
+William Gilpin, Vivek N. Prakash, and Manu Prakash, 2015
 
 
 
