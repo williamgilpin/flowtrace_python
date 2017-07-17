@@ -107,6 +107,7 @@ def flowtrace(image_dir, frames_to_merge, out_dir='same', use_parallel=True, max
     William Gilpin, Vivek Prakash, and Manu Prakash, 2015
     '''
     image_files = glob.glob(image_dir+'/*.tif')
+    image_files.sort()  # sort the glob list
     image_files = image_files[::frames_to_skip]
     im_path = os.path.split(image_files[0])[:-1][0]
     if out_dir == 'same':
