@@ -1,8 +1,6 @@
-# flowtrace for Python
+# Flowtrace
 
-# Flowtrace for Python
-
-Implementation of the flowtrace tool as a module for Python 2 / Python 3
+Trace pathlines in a flow using Python
 
 ![Example frame of a flowtrace video](resources/example_image.png)	
 
