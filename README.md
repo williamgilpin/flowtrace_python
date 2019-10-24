@@ -4,7 +4,7 @@
 
 Implementation of the flowtrace tool as a module for Python 2 / Python 3
 
-![Example frame of a flowtrace video](resources/example_image.tif)	
+![Example frame of a flowtrace video](resources/example_image.png)	
 
 Examples of this code applied to videos can be found [here](http://www.wgilpin.com/flowtrace_docs/gallery.html). If you find this repository useful, please consider citing the accompanying paper:
 
