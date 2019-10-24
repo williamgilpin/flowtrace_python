@@ -4,7 +4,7 @@
 
 Implementation of the flowtrace tool as a module for Python 2 / Python 3
 
-![Example frame of a flowtrace video](resources/example)image.tif)	
+![Example frame of a flowtrace video](resources/example_image.tif)	
 
 Examples of this code applied to videos can be found [here](http://www.wgilpin.com/flowtrace_docs/gallery.html). If you find this repository useful, please consider citing the accompanying paper:
 
@@ -108,18 +108,6 @@ Adjust the number of cores that the code uses to multithread
 ## Future
 
 Bug reports and pull requests are encouraged [through GitHub](https://github.com/williamgilpin/flowtrace_python)
-
-
-<script>
-  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
-  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
-  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
-  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
-
-  ga('create', 'UA-52823035-4', 'auto');
-  ga('send', 'pageview');
-
-</script>
 
 
 
