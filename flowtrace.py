@@ -22,7 +22,6 @@ import warnings
 import os
 import glob
 
-
 from scipy.misc import toimage
 from scipy.misc import imsave
 
@@ -58,53 +57,41 @@ def flowtrace(image_dir, frames_to_merge, out_dir='same', use_parallel=True, max
     RAM to store an entire z-projection stack in memory. When using multithreading,
     be sure to multiply the memory usage per stack by the number of cores that will be used.
     
-    Parameters
-    ----------
-    image_dir : str
-        path to directory containing raw image files
-        
-    frames_to_merge : int
-        The numbe of frames to merge to form a single streamline image
+    Args:
+        image_dir : str
+            path to directory containing raw image files
+        frames_to_merge : int
+            The numbe of frames to merge to form a single streamline image
+        out_dir : str
+            path to directory where streamline files are saved
+        max_cores : int
+            With multi-threading enabled, the maximum number of simultaneous jobs
+            to run. When running this, it's useful to calculate the total RAM available
+            versus that required to completely hold an image stack of length frames_to_merge,
+            since parallelization is not useful if there's not enough RAM for each core to
+            complete a task
+        frames_to_skip : int
+            The number of images to skip when building each substack
     
-    out_dir : str
-        path to directory where streamline files are saved
+    Kwargs:
+        take_diff : bool
+            whether to take the difference of consecutive frames
+        diff_order : int
+            the order of the difference in frames when take_diff is used
+        subtract_median : bool
+            For each substack, subtract the median before taking the 
+            z projection
+        subtract_first : bool
+            For each substack, subtract the first frame before taking the 
+            z projection
+        add_first_frame : bool
+            Add the unaltered first frame of the stack back to the stack
+            before taking z projection. Makes it possible to view sharp structures
+            in median transformed data
+        color_series : bool
+            Color the time traces
         
-    max_cores : int
-        With multi-threading enabled, the maximum number of simultaneous jobs
-        to run. When running this, it's useful to calculate the total RAM available
-        versus that required to completely hold an image stack of length frames_to_merge,
-        since parallelization is not useful if there's not enough RAM for each core to
-        complete a task
-
-    frames_to_skip : int
-        The number of images to skip when building each substack
-
-    kwargs
-    ------
-
-    take_diff : bool
-        whether to take the difference of consecutive frames
-    
-    diff_order : int
-        the order of the difference in frames when take_diff is used
-
-    subtract_median : bool
-        For each substack, subtract the median before taking the 
-        z projection
-
-    subtract_first : bool
-        For each substack, subtract the first frame before taking the 
-        z projection
-
-    add_first_frame : bool
-        Add the unaltered first frame of the stack back to the stack
-        before taking z projection. Makes it possible to view sharp structures
-        in median transformed data
-
-    color_series : bool
-        Color the time traces
-        
-    William Gilpin, Vivek Prakash, and Manu Prakash, 2015
+    William Gilpin, 2015
     '''
     image_files = glob.glob(image_dir+'/*.tif')
     image_files = image_files[::frames_to_skip]
@@ -160,52 +147,39 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
     RAM to store all the images in memory, but which DO have enough 
     RAM to store an entire z-projection stack in memory
     
-    Parameters
-    ----------
-    frames_list : list of str
-        list of image files
-        
-    frames_to_merge : int
-        The number of frames to merge to form a single streamline image
+    Args:
+        frames_list : list of str
+            list of image files
+        frames_to_merge : int
+            The number of frames to merge to form a single streamline image
+        out_dir : str
+            path to directory where streamline files are saved
+        take_diff : bool
+            whether to take the difference of consecutive frames 
+        diff_order : int
+            the order of the difference in frames when take_diff is used
+        subtract_median : bool
+            For each substack, subtract the median before taking the 
+            z projection
+        subtract_first : bool
+            For each substack, subtract the first frame before taking the 
+            z projection
+        add_first_frame : bool
+            Add the unaltered first frame of the stack back to the stack
+            before taking z projection. Makes it possible to view sharp structures
+            in median transformed data
+        invert_color : bool
+            Set to True if working with dark particles on a light background
+        color_series : bool
+            Color the time traces
     
-    out_dir : str
-        path to directory where streamline files are saved
-        
-    take_diff : bool
-        whether to take the difference of consecutive frames
-    
-    diff_order : int
-        the order of the difference in frames when take_diff is used
-
-    subtract_median : bool
-        For each substack, subtract the median before taking the 
-        z projection
-
-    subtract_first : bool
-        For each substack, subtract the first frame before taking the 
-        z projection
-
-    add_first_frame : bool
-        Add the unaltered first frame of the stack back to the stack
-        before taking z projection. Makes it possible to view sharp structures
-        in median transformed data
-
-    invert_color : bool
-        Set to True if working with dark particles on a light background
-
-    color_series : bool
-        Color the time traces
-
-
-        
-    William Gilpin, Vivek Prakash, and Manu Prakash, 2015
+    William Gilpin, 2015
     '''
 
     if 'diff_order' in kwargs:
         diff_order = kwargs['diff_order']
     else:
         diff_order = 1
-
 
     image_files = frames_list
     im_path = os.path.split(image_files[0])[:-1][0]
@@ -239,7 +213,6 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
                 stack = roll(stack, -1, axis=2)
             im = imread2(image_files[ii+frames_to_merge])
             stack[...,-1] = im
-
         stack2 = stack.copy()
 
 
@@ -247,17 +220,20 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
             if kwargs['subtract_first']:
                 front_im = stack2[...,0]
                 stack2 = stack2-front_im[..., newaxis]
+        
         if 'subtract_median' in kwargs:
             if kwargs['subtract_median']:
                 med_im= median(stack2, axis=-1)
                 stack2 = stack2-med_im[..., newaxis]
+        
         if 'take_diff' in kwargs:
             if kwargs['take_diff']:
                 stack2 = diff(stack2, n=diff_order, axis=-1)
 
         if 'add_first_frame' in kwargs:        
             if kwargs['add_first_frame']:
-                stack2 = dstack([stack2, stack[...,0]])
+                # stack2 = dstack([stack2, stack[...,0]])
+                stack2 = concatenate((stack2, expand_dims(stack[..., 0], axis=-1)), axis=-1)
         
         if 'color_series' in kwargs:
             if kwargs['color_series']:
@@ -269,7 +245,6 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
                 rvals, gvals, bvals = stack2*fullcmap[:, 0], stack2*fullcmap[:, 1], stack2*fullcmap[:, 2]
                 stack2 = concatenate([rvals[...,newaxis],gvals[...,newaxis],bvals[...,newaxis]],axis=-1)
                 stack2 = swapaxes(stack2,-1,-2)
-
 
         if 'invert_color' in kwargs:
             if 'color_series' in kwargs:
@@ -293,7 +268,8 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
         toimage(max_proj, cmin=0.0, cmax=max(ravel(max_proj))).save(savestr)
 
 
-def overlay_images(dir1, dir2, out_dir, ftype1='.tif',ftype2='.tif'):
+def overlay_images(dir1, dir2, out_dir, ftype1='.tif', ftype2='.tif', 
+    tint_color = (127/255., 255/255., 212/255.)):
     '''
     Given two directories full of images, load one image from each directory and 
     overlay it on the other with the specified tint and color
@@ -303,15 +279,14 @@ def overlay_images(dir1, dir2, out_dir, ftype1='.tif',ftype2='.tif'):
 
     dir1 : str
         Path to the directory of images that will be used as the background
-
     dir2 : str
         Path to the directory of images that will be tinted and overlaid
-
     out_dir : str
         Path to the directory at which output will be saved
+    tint_color : 3-list
+        Three values between 0 and 1 specifying a color in RGB
 
-    '''
-    tint_color = (127/255., 255/255., 212/255.)
+    '''  
 
 # rvals, gvals, bvals = stack2*fullcmap[:, 0], stack2*fullcmap[:, 1], stack2*fullcmap[:, 2]
 #                 stack2 = concatenate([rvals[...,newaxis],gvals[...,newaxis],bvals[...,newaxis]],axis=-1)
@@ -376,7 +351,8 @@ def cmap1D(col1, col2, N):
 
 
 
-def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png'):
+def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png',
+    bg_color=(153/255., 204/255., 255/255.), fg_color=(255/255., 204/255., 102/255.)):
     '''
     Given two directories full of images, load one image from each directory and 
     overlay it on the other with the specified tint and color
@@ -386,26 +362,28 @@ def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png'):
 
     dir1 : str
         Path to the directory of images that will be used as the background
-
     dir2 : str
         Path to the directory of images that will be tinted and overlaid
-
     out_dir : str
         Path to the directory at which output will be saved
+    bg_color : 3-list
+        Three values between 0 and 1 specifying a color in RGB
+    fg_color : 3-list
+        Three values between 0 and 1 specifying a color in RGB
 
     '''
   
 
     bg_ims = glob.glob(dir1+'/*'+ftype1)
     fg_ims = glob.glob(dir2+'/*'+ftype2)
-    bg_color = (153/255., 204/255., 255/255.)
-    fg_color = (255/255., 204/255., 102/255.)
+    
+    
 
-    if len(bg_ims) != len(bg_ims):
+    if len(bg_ims) != len(fg_ims):
         warnings.warn("The two image directories contain different numbers of images.")
     
     for ind, bg_im in enumerate(bg_ims):
-        
+
         fg_im = fg_ims[ind]
         im1 = imread2(bg_im)
         if len(im1.shape)==3:
@@ -415,7 +393,6 @@ def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png'):
         if len(im2.shape)==3:
             im2 = sum(im2, axis=2)/3.
 
-
         im2_norm = im2.astype(double)/255.
         im2_mask = im2_norm < .2
         
@@ -424,7 +401,7 @@ def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png'):
         just_bigger_sizes = grey_dilation(just_bigger_sizes, size=(2,2))
         
         im2_norm = im2.astype(double)/255.
-#         im2_mask = im2_norm > .2
+        # im2_mask = im2_norm > .2
         im2_norm[~im2_mask] = 0.0
         just_smaller_sizes = im2_norm*im1
         
@@ -436,11 +413,8 @@ def overlay_images(dir1, dir2, out_dir, ftype1='.png',ftype2='.png'):
         just_smaller_sizes = (just_smaller_sizes.astype(double)/norm_factor1)*255
         just_bigger_sizes = (just_bigger_sizes.astype(double)/norm_factor2)*255
         
-        
-        rgb_bg = concatenate([(just_smaller_sizes*chan)[...,newaxis] for chan in bg_color],axis=-1)
-        
-        rgb_img = concatenate([(just_bigger_sizes*chan)[...,newaxis] for chan in fg_color],axis=-1)
-        
+        rgb_bg = concatenate([(just_smaller_sizes*chan)[...,newaxis] for chan in bg_color], axis=-1)
+        rgb_img = concatenate([(just_bigger_sizes*chan)[...,newaxis] for chan in fg_color], axis=-1)
         finim = rgb_bg + rgb_img
 
         bg_name = os.path.split(bg_im)[-1][:-4]
