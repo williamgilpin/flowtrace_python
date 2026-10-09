@@ -311,7 +311,7 @@ def flowtrace(image_dir, frames_to_merge, out_dir='same', use_parallel=True, max
             chunk+=(chunks_list[ind+1][:frames_to_merge])
 
         # now run parallel processes
-        processes = [mp.Process(target=sliding_zproj_internal, args=(chunks_list[ii], frames_to_merge, out_dir), kwargs=kwargs) for ii in range(num_cores)]
+        processes = [mp.Process(target=sliding_zproj_internal, args=(chunks_list[ii], frames_to_merge, out_dir), kwargs=kwargs) for ii in range(len(chunks_list))]
         # Run processes
         for p in processes:
             p.start()
