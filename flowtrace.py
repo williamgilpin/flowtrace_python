@@ -392,7 +392,7 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
                 stack = np.roll(stack, -1, axis=3)
             else:
                 stack = np.roll(stack, -1, axis=2)
-            im = imread2(image_files[ii+frames_to_merge])
+            im = imread2(image_files[ii+frames_to_merge-1])
             stack[...,-1] = im
         stack2 = stack.copy()
 
