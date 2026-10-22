@@ -155,23 +155,23 @@ def toimage(arr, high=255, low=0, cmin=None, cmax=None, pal=None,
         shape = (shape[1], shape[0])  # columns show up first
         if mode == 'F':
             data32 = data.astype(np.float32)
-            image = Image.frombytes(mode, shape, data32.tostring())
+            image = Image.frombytes(mode, shape, data32.tobytes())
             return image
         if mode in [None, 'L', 'P']:
             bytedata = bytescale(data, high=high, low=low,
                                  cmin=cmin, cmax=cmax)
-            image = Image.frombytes('L', shape, bytedata.tostring())
+            image = Image.frombytes('L', shape, bytedata.tobytes())
             if pal is not None:
-                image.putpalette(np.asarray(pal, dtype=np.uint8).tostring())
+                image.putpalette(np.asarray(pal, dtype=np.uint8).tobytes())
                 # Becomes a mode='P' automagically.
             elif mode == 'P':  # default gray-scale
                 pal = (np.arange(0, 256, 1, dtype=np.uint8)[:, np.newaxis] *
                        np.ones((3,), dtype=np.uint8)[np.newaxis, :])
-                image.putpalette(np.asarray(pal, dtype=np.uint8).tostring())
+                image.putpalette(np.asarray(pal, dtype=np.uint8).tobytes())
             return image
         if mode == '1':  # high input gives threshold for 1
             bytedata = (data > high)
-            image = Image.frombytes('1', shape, bytedata.tostring())
+            image = Image.frombytes('1', shape, bytedata.tobytes())
             return image
         if cmin is None:
             cmin = np.amin(np.ravel(data))
@@ -180,7 +180,7 @@ def toimage(arr, high=255, low=0, cmin=None, cmax=None, pal=None,
         data = (data*1.0 - cmin)*(high - low)/(cmax - cmin) + low
         if mode == 'I':
             data32 = data.astype(np.uint32)
-            image = Image.frombytes(mode, shape, data32.tostring())
+            image = Image.frombytes(mode, shape, data32.tobytes())
         else:
             raise ValueError(_errstr)
         return image
@@ -205,13 +205,13 @@ def toimage(arr, high=255, low=0, cmin=None, cmax=None, pal=None,
 
     bytedata = bytescale(data, high=high, low=low, cmin=cmin, cmax=cmax)
     if ca == 2:
-        strdata = bytedata.tostring()
+        strdata = bytedata.tobytes()
         shape = (shape[1], shape[0])
     elif ca == 1:
-        strdata = np.transpose(bytedata, (0, 2, 1)).tostring()
+        strdata = np.transpose(bytedata, (0, 2, 1)).tobytes()
         shape = (shape[2], shape[0])
     elif ca == 0:
-        strdata = np.transpose(bytedata, (1, 2, 0)).tostring()
+        strdata = np.transpose(bytedata, (1, 2, 0)).tobytes()
         shape = (shape[2], shape[1])
     if mode is None:
         if numch == 3:
@@ -311,7 +311,7 @@ def flowtrace(image_dir, frames_to_merge, out_dir='same', use_parallel=True, max
             chunk+=(chunks_list[ind+1][:frames_to_merge])
 
         # now run parallel processes
-        processes = [mp.Process(target=sliding_zproj_internal, args=(chunks_list[ii], frames_to_merge, out_dir), kwargs=kwargs) for ii in range(num_cores)]
+        processes = [mp.Process(target=sliding_zproj_internal, args=(chunks_list[ii], frames_to_merge, out_dir), kwargs=kwargs) for ii in range(len(chunks_list))]
         # Run processes
         for p in processes:
             p.start()
@@ -373,12 +373,20 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
     else:
         rgb_flag=False
 
-    # preallocate storage array
+    # Only build a full floating-point copy of the stack when a transform
+    # actually needs one; a plain max/min projection works directly on the
+    # ring buffer in the image's native dtype, which keeps memory use low
+    # and avoids re-allocating hundreds of MB per frame on large videos.
+    needs_ordered_stack = any(kwargs.get(key) for key in
+                              ('subtract_first', 'subtract_median', 'take_diff',
+                               'add_first_frame', 'color_series'))
+
+    # preallocate storage array (ring buffer along the last axis)
     if rgb_flag:
         stack_shape = frame0.shape+(3,)+(frames_to_merge,)
     else:
         stack_shape = frame0.shape+(frames_to_merge,)
-    stack = zeros(stack_shape)
+    stack = None
 
 
     for ii in range(len(image_files)-frames_to_merge):
@@ -386,15 +394,22 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
         if ii == 0:    
             for jj in range(frames_to_merge):
                 im = imread2(image_files[jj])
+                if stack is None:
+                    stack = zeros(stack_shape, dtype=im.dtype)
                 stack[...,jj] = im
         else:
-            if rgb_flag:
-                stack = np.roll(stack, -1, axis=3)
-            else:
-                stack = np.roll(stack, -1, axis=2)
-            im = imread2(image_files[ii+frames_to_merge])
-            stack[...,-1] = im
-        stack2 = stack.copy()
+            # overwrite the oldest frame in place instead of rolling the array,
+            # so the window is always frames [ii, ii + frames_to_merge)
+            im = imread2(image_files[ii+frames_to_merge-1])
+            stack[..., (ii - 1) % frames_to_merge] = im
+
+        if needs_ordered_stack:
+            # chronologically ordered float copy, oldest frame first
+            start = ii % frames_to_merge
+            stack2 = np.concatenate((stack[..., start:], stack[..., :start]), axis=-1).astype(float64)
+            first_frame = stack2[..., 0].copy()
+        else:
+            stack2 = stack
 
 
         if 'subtract_first' in kwargs:
@@ -413,8 +428,7 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
 
         if 'add_first_frame' in kwargs:        
             if kwargs['add_first_frame']:
-                # stack2 = dstack([stack2, stack[...,0]])
-                stack2 = np.concatenate((stack2, np.expand_dims(stack[..., 0], axis=-1)), axis=-1)
+                stack2 = np.concatenate((stack2, np.expand_dims(first_frame, axis=-1)), axis=-1)
         
         if 'color_series' in kwargs:
             if kwargs['color_series']:
@@ -438,6 +452,10 @@ def sliding_zproj_internal(frames_list, frames_to_merge, out_dir, **kwargs):
                 max_proj = stack2.max(axis=-1)
         else:
             max_proj = stack2.max(axis=-1)
+
+        # toimage() only rescales floating point data, so make sure the
+        # projection is float regardless of the dtype of the input frames
+        max_proj = np.asarray(max_proj, dtype=float64)
 
 
         im_name = os.path.split(image_files[ii])[-1][:-4]
